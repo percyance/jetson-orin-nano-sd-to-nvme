@@ -22,7 +22,7 @@
 set -euo pipefail
 
 # ---- tunables ---------------------------------------------------------------
-ESP_SIZE="1GiB"          # size of the EFI System Partition to create on the NVMe
+ESP_MIB=1024             # size (MiB) of the EFI System Partition on the NVMe  (1024 = 1GiB)
 MNT=/mnt/nvme            # temp mountpoint for the NVMe rootfs
 ESPMNT=/mnt/nvme-esp     # temp mountpoint for the NVMe ESP
 LOG=/var/log/clone-sd-to-nvme.log
@@ -67,8 +67,15 @@ read -rp ">>> Type YES to continue: " ans
 say "[1/8] Partition the NVMe  (p1 = APP/rootfs, p2 = ESP)"
 for m in "$APP_PART" "$ESP_PART" "$MNT" "$ESPMNT"; do umount "$m" 2>/dev/null || true; done
 parted -s "$NVME_DISK" mklabel gpt
-parted -s "$NVME_DISK" mkpart APP ext4  1MiB "-$ESP_SIZE"
-parted -s "$NVME_DISK" mkpart ESP fat32 "-$ESP_SIZE" 100%
+# NOTE: parted (GNU parted 3.4) rejects negative positions like "-1GiB" — its
+# arg parser reads the leading '-' as option flags (-1 -G -i -B). So instead of
+# measuring the ESP from the end of the disk, compute an ABSOLUTE boundary:
+#   APP = 1MiB .. (disk_end - ESP),   ESP = (disk_end - ESP) .. 100%
+DISK_MIB=$(( $(blockdev --getsize64 "$NVME_DISK") / 1048576 ))
+APP_END_MIB=$(( DISK_MIB - ESP_MIB ))          # leave ESP_MIB (from tunables) free at the end
+echo "  disk=${DISK_MIB}MiB  ->  APP 1..${APP_END_MIB}MiB, ESP ${APP_END_MIB}..end"
+parted -s "$NVME_DISK" mkpart APP ext4  1MiB          "${APP_END_MIB}MiB"
+parted -s "$NVME_DISK" mkpart ESP fat32 "${APP_END_MIB}MiB" 100%
 parted -s "$NVME_DISK" set 2 esp on
 parted -s "$NVME_DISK" set 2 boot on
 partprobe "$NVME_DISK"; sleep 2
