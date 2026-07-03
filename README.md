@@ -1,6 +1,6 @@
 # Jetson Orin Nano: migrate a running system from SD card to NVMe SSD
 
-**One command, run on the Jetson itself, moves a running JetPack 6 system from the microSD card onto an NVMe SSD. No second PC, no SDK Manager, no re-flash.**
+**One command, run on the Jetson itself, moves a running JetPack 6 system from the microSD card onto an NVMe SSD. No second PC, no SDK Manager, no recovery mode, no re-flash.**
 
 ```bash
 sudo ./clone-sd-to-nvme.sh   # from the SD system, type YES when prompted
